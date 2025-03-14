@@ -1,41 +1,64 @@
 import 'package:flutter/material.dart';
+import 'sound_list_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const BirthdayCardApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  final String? savedName = prefs.getString('user_name');
+  
+  runApp(BirthdayCardApp(initialName: savedName));
 }
 
 class BirthdayCardApp extends StatelessWidget {
-  const BirthdayCardApp({Key? key}) : super(key: key);
+  final String? initialName;
+  
+  const BirthdayCardApp({Key? key, this.initialName}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        backgroundColor: Color(0xFF59BFC6), // Teal Background
-        body: const BirthdayCard(),
-      ),
+      home: initialName == null 
+          ? const Scaffold(
+              backgroundColor: Color(0xFF59BFC6),
+              body: BirthdayCard(),
+            )
+          : SecondPage(userName: initialName!),
+      routes: {
+        '/second': (context) => const SecondPage(),
+        '/sound-list': (context) => const SoundListPage(),
+      },
     );
   }
 }
 
-class BirthdayCard extends StatelessWidget {
+class BirthdayCard extends StatefulWidget {
   const BirthdayCard({Key? key}) : super(key: key);
+
+  @override
+  _BirthdayCardState createState() => _BirthdayCardState();
+}
+
+class _BirthdayCardState extends State<BirthdayCard> {
+  final TextEditingController _nameController = TextEditingController();
+  String _name = '';
+
+  Future<void> _saveName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_name', name);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Confetti Decorations
         ..._buildConfetti(),
-
-        // Centered Birthday Card Content
         Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Happy Birthday Text
               const Text(
-                'EID DAY',
+                'SALAM BRO',
                 style: TextStyle(
                   fontSize: 48,
                   fontWeight: FontWeight.bold,
@@ -43,17 +66,49 @@ class BirthdayCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              // Cupcake with Candle
               _buildCupcake(),
               const SizedBox(height: 10),
-              // Bottom Message
-              const Text(
-                'Happy Hari Raya!',
-                style: TextStyle(fontSize: 22, color: Colors.black),
+              Text(
+                _name.isEmpty ? 'Happy Hari Raya!' : 'Happy Hari Raya, $_name!',
+                style: const TextStyle(fontSize: 22, color: Colors.black),
               ),
               const Text(
-                '-from Muard',
+                '-from Johan',
                 style: TextStyle(fontSize: 18, color: Colors.black54),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Please enter your name',
+                  border: OutlineInputBorder(),
+                  filled: true,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _name = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: () async {
+                  if (_name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter your name first')),
+                    );
+                    return;
+                  }
+                  await _saveName(_name);
+                  if (!mounted) return;
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SecondPage(userName: _name),
+                    ),
+                  );
+                },
+                child: const Text('Go to Happy Eid Page'),
               ),
             ],
           ),
@@ -62,8 +117,7 @@ class BirthdayCard extends StatelessWidget {
     );
   }
 
-  // Confetti Dots
-  List<Widget> _buildConfetti() {
+  List<Widget> _buildConfetti() { // Group multiple widgets to create complex or dynamic UIs
     final confettiColors = [Colors.yellow, Colors.red, Colors.blue, Colors.pink];
     final positions = [
       const Offset(50, 50),
@@ -89,7 +143,6 @@ class BirthdayCard extends StatelessWidget {
     });
   }
 
-  // Cupcake Widget
   Widget _buildCupcake() {
     return SizedBox(
       width: 200,
@@ -97,7 +150,6 @@ class BirthdayCard extends StatelessWidget {
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          // Cupcake Base
           Container(
             width: 120,
             height: 80,
@@ -107,7 +159,6 @@ class BirthdayCard extends StatelessWidget {
               border: Border.all(color: Colors.greenAccent, width: 2),
             ),
           ),
-          // Whipped Cream (Placeholder with White Container)
           Positioned(
             top: 0,
             child: Container(
@@ -120,13 +171,12 @@ class BirthdayCard extends StatelessWidget {
                   BoxShadow(
                     color: Colors.black26,
                     blurRadius: 5,
-                    offset: Offset(0, 5),
-                  )
+                    offset: const Offset(0, 5),
+                  ),
                 ],
               ),
             ),
           ),
-          // Candle
           Positioned(
             top: 10,
             child: Column(
@@ -146,6 +196,80 @@ class BirthdayCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SecondPage extends StatelessWidget {
+  final String userName;
+  
+  const SecondPage({Key? key, this.userName = ''}) : super(key: key);
+
+  Future<void> _resetName(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_name');
+    if (!context.mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const BirthdayCard()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String displayName = userName.isNotEmpty 
+        ? userName 
+        : (ModalRoute.of(context)?.settings.arguments as String? ?? '');
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Happy Eid'),
+        automaticallyImplyLeading: false, // This removes the back button
+      ),
+      body: Column(
+        children: [
+          const SizedBox(height: 20),
+          Center(
+            child: Text(
+              'Happy Eid $displayName!',
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Image.network(
+            'https://uploads.dailydot.com/2024/09/roblox-face-meme.jpg?q=65&auto=format&w=1200&ar=2:1&fit=crop',
+            width: double.infinity,
+            height: 200,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Center(
+                child: CircularProgressIndicator(
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded / (loadingProgress.expectedTotalBytes ?? 1)
+                      : null,
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              return const Center(child: Text('Failed to load image'));
+            },
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/sound-list');
+            },
+            child: const Text('Go to Sound List'),
+          ),
+          ElevatedButton(
+            onPressed: () => _resetName(context),
+            child: const Text('Reset Name'),
           ),
         ],
       ),
